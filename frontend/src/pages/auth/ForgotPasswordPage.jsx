@@ -8,7 +8,6 @@ import AuthLayout from '@/components/layout/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { requestPasswordReset } from '@/services/authService'
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation()
@@ -20,9 +19,10 @@ export default function ForgotPasswordPage() {
   })
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) })
 
-  const onSubmit = async ({ contact }) => {
+    const onSubmit = async ({ contact }) => {
     setSubmitting(true)
-    await requestPasswordReset(contact)
+    // Mock request for now
+    await new Promise((resolve) => setTimeout(resolve, 500))
     setSubmitting(false)
     setSent(true)
   }
