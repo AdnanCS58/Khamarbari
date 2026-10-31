@@ -68,3 +68,8 @@ export async function updateProfile(patch) {
   // For now, this still updates locally to keep the demo running smoothly
   return { data: patch, error: null } 
 }
+
+export async function requestPasswordReset(contact) {
+  // Mocked for now until an email service (like SendGrid) is connected
+  return { data: { ok: true, contact }, error: null }
+}
