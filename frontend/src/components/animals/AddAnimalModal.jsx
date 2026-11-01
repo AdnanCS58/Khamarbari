@@ -73,7 +73,7 @@ export default function AddAnimalModal({ open, onOpenChange, enclosure, onSaved 
               <Input type="number" min="1" value={form.count} onChange={(e) => setForm({ ...form, count: e.target.value })} className="mt-1.5" />
             </div>
             <div>
-              <Label>Gender</Label>
+              <Label>GENDER</Label>
               <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
