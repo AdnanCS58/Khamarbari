@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
 import { listEnclosures, createEnclosure } from '@/services/enclosuresService'
 import SproutLoader from '@/components/common/SproutLoader'
-import AddAnimalModal from '@/components/Animals/AddAnimalModal'
+import AddAnimalModal from '@/components/animals/AddAnimalModal'
 
 const useEnclosureTypes = () => {
   const { t } = useTranslation()
