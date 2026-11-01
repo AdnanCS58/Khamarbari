@@ -4,47 +4,55 @@ import {
   Beef, Warehouse, Waves, Rows3, Plus, Search, LayoutGrid, List,
   ChevronRight, MoreVertical, X, Bird, Fish, Rabbit, HeartPulse,
   CalendarDays, Users, MapPin, Ruler, AlertTriangle, TrendingUp, Boxes,
+  PlusCircle
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
 import { listEnclosures, createEnclosure } from '@/services/enclosuresService'
 import SproutLoader from '@/components/common/SproutLoader'
+import AddAnimalModal from '@/components/Animals/AddAnimalModal'
 
 const useEnclosureTypes = () => {
   const { t } = useTranslation()
   return [
-    { id: 'room', icon: Warehouse, label: t('animalsPage.typeRoom'), hint: t('animalsPage.typeRoomHint'),
+    {
+      id: 'room', icon: Warehouse, label: t('animalsPage.typeRoom'), hint: t('animalsPage.typeRoomHint'),
       sizeLabel: t('animalsPage.modalSizeRoom'), sizeUnit: 'm²', capacityLabel: t('animalsPage.modalCapacityRoom'),
-      accent: 'var(--color-forest-500)' },
-    { id: 'line', icon: Rows3, label: t('animalsPage.typeLine'), hint: t('animalsPage.typeLineHint'),
+      accent: 'var(--color-forest-500)'
+    },
+    {
+      id: 'line', icon: Rows3, label: t('animalsPage.typeLine'), hint: t('animalsPage.typeLineHint'),
       sizeLabel: t('animalsPage.modalSizeLine'), sizeUnit: 'm', capacityLabel: t('animalsPage.modalCapacityLine'),
-      accent: 'var(--color-warn-500)' },
-    { id: 'pond', icon: Waves, label: t('animalsPage.typePond'), hint: t('animalsPage.typePondHint'),
+      accent: 'var(--color-warn-500)'
+    },
+    {
+      id: 'pond', icon: Waves, label: t('animalsPage.typePond'), hint: t('animalsPage.typePondHint'),
       sizeLabel: t('animalsPage.modalSizePond'), sizeUnit: 'm²', capacityLabel: t('animalsPage.modalCapacityPond'),
-      accent: 'var(--color-info-500)' },
+      accent: 'var(--color-info-500)'
+    },
   ]
 }
 
 const useSpecies = () => {
   const { t } = useTranslation()
   return [
-    { id: 'chicken', label: t('animalsPage.speciesChicken'), icon: Bird,   enclosure: 'room', defaultBreed: 'Broiler / Layer' },
-    { id: 'duck',    label: t('animalsPage.speciesDuck'),    icon: Bird,   enclosure: 'pond', defaultBreed: 'Khaki Campbell' },
-    { id: 'cow',     label: t('animalsPage.speciesCow'),     icon: Beef,   enclosure: 'line', defaultBreed: 'Holstein Friesian' },
-    { id: 'goat',    label: t('animalsPage.speciesGoat'),    icon: Beef,   enclosure: 'line', defaultBreed: 'Black Bengal' },
-    { id: 'sheep',   label: t('animalsPage.speciesSheep'),   icon: Beef,   enclosure: 'line', defaultBreed: 'Garole' },
-    { id: 'fish',    label: t('animalsPage.speciesFish'),    icon: Fish,   enclosure: 'pond', defaultBreed: 'Tilapia / Rohu' },
-    { id: 'shrimp',  label: t('animalsPage.speciesShrimp'),  icon: Fish,   enclosure: 'pond', defaultBreed: 'Bagda' },
-    { id: 'rabbit',  label: t('animalsPage.speciesRabbit'),  icon: Rabbit, enclosure: 'room', defaultBreed: 'New Zealand' },
+    { id: 'chicken', label: t('animalsPage.speciesChicken'), icon: Bird, enclosure: 'room', defaultBreed: 'Broiler / Layer' },
+    { id: 'duck', label: t('animalsPage.speciesDuck'), icon: Bird, enclosure: 'pond', defaultBreed: 'Khaki Campbell' },
+    { id: 'cow', label: t('animalsPage.speciesCow'), icon: Beef, enclosure: 'line', defaultBreed: 'Holstein Friesian' },
+    { id: 'goat', label: t('animalsPage.speciesGoat'), icon: Beef, enclosure: 'line', defaultBreed: 'Black Bengal' },
+    { id: 'sheep', label: t('animalsPage.speciesSheep'), icon: Beef, enclosure: 'line', defaultBreed: 'Garole' },
+    { id: 'fish', label: t('animalsPage.speciesFish'), icon: Fish, enclosure: 'pond', defaultBreed: 'Tilapia / Rohu' },
+    { id: 'shrimp', label: t('animalsPage.speciesShrimp'), icon: Fish, enclosure: 'pond', defaultBreed: 'Bagda' },
+    { id: 'rabbit', label: t('animalsPage.speciesRabbit'), icon: Rabbit, enclosure: 'room', defaultBreed: 'New Zealand' },
   ]
 }
 
 const useHealthStates = () => {
   const { t } = useTranslation()
   return [
-    { id: 'healthy',    label: t('animalsPage.healthHealthy'),    color: 'var(--color-forest-500)' },
-    { id: 'watch',      label: t('animalsPage.healthWatch'),      color: 'var(--color-warn-500)' },
-    { id: 'treatment',  label: t('animalsPage.healthTreatment'),  color: 'var(--color-alert-500)' },
+    { id: 'healthy', label: t('animalsPage.healthHealthy'), color: 'var(--color-forest-500)' },
+    { id: 'watch', label: t('animalsPage.healthWatch'), color: 'var(--color-warn-500)' },
+    { id: 'treatment', label: t('animalsPage.healthTreatment'), color: 'var(--color-alert-500)' },
     { id: 'quarantine', label: t('animalsPage.healthQuarantine'), color: 'var(--color-info-500)' },
   ]
 }
@@ -88,7 +96,7 @@ const OccupancyBar = ({ occupied, capacity }) => {
   )
 }
 
-const EnclosureCard = ({ enc, onOpen }) => {
+const EnclosureCard = ({ enc, onOpen, onAddAnimal }) => {
   const { t } = useTranslation()
   const ENCLOSURE_TYPES = useEnclosureTypes()
   const SPECIES = useSpecies()
@@ -100,9 +108,9 @@ const EnclosureCard = ({ enc, onOpen }) => {
   const SpeciesIcon = species?.icon ?? Beef
 
   return (
-    <button
+    <div
       onClick={() => onOpen(enc)}
-      className="group relative overflow-hidden rounded-2xl border bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(6,28,21,0.10)]"
+      className="group relative cursor-pointer overflow-hidden rounded-2xl border bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(6,28,21,0.10)]"
       style={{ borderColor: 'var(--color-cream-200)' }}
     >
       <div className="absolute inset-x-0 top-0 h-1" style={{ background: type.accent }} />
@@ -145,11 +153,22 @@ const EnclosureCard = ({ enc, onOpen }) => {
 
       <div className="mt-3 flex items-center justify-between border-t border-cream-200 pt-3">
         <span className="text-[10px] text-slate-soft">{t('animalsPage.checkedPrefix')} {enc.lastCheck}</span>
-        <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: type.accent }}>
-          {t('animalsPage.manage')} <ChevronRight size={12} />
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddAnimal(enc);
+            }}
+            className="flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+          >
+            <PlusCircle size={12} /> Add
+          </button>
+          <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: type.accent }}>
+            {t('animalsPage.manage')} <ChevronRight size={12} />
+          </span>
+        </div>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -308,6 +327,9 @@ export default function AnimalsPage() {
   const [query, setQuery] = useState('')
   const [openCreate, setOpenCreate] = useState(false)
 
+  const [animalModalOpen, setAnimalModalOpen] = useState(false)
+  const [selectedEnclosure, setSelectedEnclosure] = useState(null)
+
   const loadEnclosures = async () => {
     if (!farm) return
     setLoading(true)
@@ -415,7 +437,15 @@ export default function AnimalsPage() {
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {enclosures.map((enc) => (
-            <EnclosureCard key={enc.id} enc={enc} onOpen={() => {}} />
+            <EnclosureCard 
+              key={enc.id} 
+              enc={enc} 
+              onOpen={() => {}} 
+              onAddAnimal={(e) => {
+                setSelectedEnclosure(e)
+                setAnimalModalOpen(true)
+              }}
+            />
           ))}
         </div>
       ) : (
@@ -430,6 +460,13 @@ export default function AnimalsPage() {
           setOpenCreate(false)
           await loadEnclosures()
         }}
+      />
+
+      <AddAnimalModal
+        open={animalModalOpen}
+        onOpenChange={setAnimalModalOpen}
+        enclosure={selectedEnclosure}
+        onSaved={loadEnclosures}
       />
     </div>
   )
