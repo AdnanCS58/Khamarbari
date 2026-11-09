@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as authService from '@/services/authService'
+import { updateFarm as updateFarmService } from '@/services/profileService'
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -39,7 +40,14 @@ export const useAuthStore = create((set, get) => ({
     const { data, error } = await authService.updateProfile(patch)
     if (error) return { error }
     set({ user: data })
-    return { error: null }
+    return { data, error: null }
+  },
+
+  async updateFarm(patch) {
+    const { data, error } = await updateFarmService(get().farm?.id, patch)
+    if (error) return { error }
+    set({ farm: data })
+    return { data, error: null }
   },
 
   isAuthenticated: () => get().status === 'authenticated',

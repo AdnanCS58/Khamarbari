@@ -39,6 +39,7 @@ export async function listExpenses(req, res, next) {
         { title: { $regex: search, $options: 'i' } },
         { supplier: { $regex: search, $options: 'i' } },
         { paidBy: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
       ]
     }
 

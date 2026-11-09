@@ -1,9 +1,12 @@
 import { z } from 'zod'
 import { Worker } from '../models/Worker.js'
+import { WorkerAttendance } from '../models/WorkerAttendance.js'
+import { WorkerPayment } from '../models/WorkerPayment.js'
 
 const createSchema = z.object({
   name: z.string().min(2),
   contact: z.string().regex(/^01[3-9]\d{8}$/),
+  nid: z.string().optional(),
   role: z.string().min(1),
   joiningDate: z.string().min(1),
   salary: z.coerce.number().nonnegative().optional(),
@@ -53,6 +56,10 @@ export async function deleteWorker(req, res, next) {
   try {
     const worker = await Worker.findOneAndDelete({ _id: req.params.id, farmId: req.user.farmId })
     if (!worker) return res.status(404).json({ error: 'Worker not found' })
+    await Promise.all([
+      WorkerAttendance.deleteMany({ farmId: req.user.farmId, workerId: worker._id }),
+      WorkerPayment.deleteMany({ farmId: req.user.farmId, workerId: worker._id }),
+    ])
     res.json({ message: 'Worker deleted' })
   } catch (err) { next(err) }
 }

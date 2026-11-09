@@ -1,23 +1,19 @@
-import { apiFetch } from '@/lib/api'
+import { createResource, deleteResource, listResource, updateResource } from './apiResource'
 
-export async function listAnimals({ enclosureId } = {}) {
-  try {
-    const url = enclosureId ? `/animals?enclosureId=${enclosureId}` : '/animals'
-    const data = await apiFetch(url)
-    return { data: data.animals, error: null }
-  } catch (error) {
-    return { data: [], error: error.message }
-  }
+const PATH = '/animals'
+
+export async function listAnimals(filters = {}) {
+  return listResource(PATH, 'animals', filters)
 }
 
 export async function createAnimal(payload) {
-  try {
-    const data = await apiFetch('/animals', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-    return { data: data.animal, error: null }
-  } catch (error) {
-    return { data: null, error: error.message }
-  }
+  return createResource(PATH, 'animal', payload)
+}
+
+export async function updateAnimal(id, patch) {
+  return updateResource(PATH, 'animal', id, patch)
+}
+
+export async function deleteAnimal(id) {
+  return deleteResource(PATH, id)
 }

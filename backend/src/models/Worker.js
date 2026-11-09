@@ -6,6 +6,7 @@ const workerSchema = new mongoose.Schema(
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
     name: { type: String, required: true, trim: true },
     contact: { type: String, required: true, trim: true },
+    nid: { type: String, trim: true, default: '' },
     role: { type: String, required: true },
     joiningDate: { type: String, required: true },
     salary: { type: Number, default: 0, min: 0 },

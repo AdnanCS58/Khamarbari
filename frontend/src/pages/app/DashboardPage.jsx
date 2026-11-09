@@ -22,6 +22,12 @@ import {
   Package,
   Users,
   Stethoscope,
+  Sun,
+  Warehouse,
+  Zap,
+  FileSpreadsheet,
+  MapPin,
+  ShieldCheck,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -32,20 +38,27 @@ import EmptyState from '@/components/common/EmptyState'
 import IncomeExpenseChart from '@/components/charts/IncomeExpenseChart'
 import HealthPieChart from '@/components/charts/HealthPieChart'
 import ProductionTrendChart from '@/components/charts/ProductionTrendChart'
+import HabitatUtilizationChart from '@/components/charts/HabitatUtilizationChart'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore } from '@/store/appStore'
 import { getDashboardSummary, getRecentActivity, getAlerts } from '@/services/dashboardService'
+import { listEnclosures } from '@/services/enclosuresService'
+import { storage } from '@/services/storage'
 import { cn } from '@/lib/utils'
+import './DashboardPage.css'
 
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
   const farm = useAuthStore((s) => s.farm)
   const { selectedBranchId, dateRange, setDateRange } = useAppStore()
+  const showDashboardAlerts = storage.get('preferences', {})?.showDashboardAlerts !== false
 
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState(null)
   const [activity, setActivity] = useState([])
   const [alerts, setAlerts] = useState([])
+  const [alertError, setAlertError] = useState('')
+  const [enclosures, setEnclosures] = useState([])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -57,17 +70,20 @@ export default function DashboardPage() {
       getDashboardSummary({ farmId: farm.id, branchId: selectedBranchId, range: dateRange }),
       getRecentActivity({ farmId: farm.id, branchId: selectedBranchId }),
       getAlerts({ farmId: farm.id, branchId: selectedBranchId }),
+      listEnclosures({ branchId: selectedBranchId }),
     ])
-      .then(([s, a, al]) => {
+      .then(([s, a, al, enclosureResult]) => {
         if (cancelled) return
-        if (s.error || !s.data) {
-          setError(s.error || 'Failed to load dashboard')
+        if (s.error || !s.data || enclosureResult.error) {
+          setError(s.error || enclosureResult.error || 'Failed to load dashboard')
           setLoading(false)
           return
         }
         setSummary(s.data)
         setActivity(a.data || [])
         setAlerts(al.data || [])
+        setAlertError(al.error || '')
+        setEnclosures(enclosureResult.data || [])
         setLoading(false)
       })
       .catch((e) => {
@@ -106,205 +122,322 @@ export default function DashboardPage() {
 
   const modules = [
     { title: 'Livestock', subtitle: 'Cattle & herd records', icon: Beef, tone: 'bg-emerald-50 text-emerald-800', to: '/dashboard/animals' },
-    { title: 'Poultry', subtitle: 'Flocks, eggs & health', icon: Bird, tone: 'bg-lime-50 text-lime-800', to: '/dashboard/animals' },
-    { title: 'Crops & vegetables', subtitle: 'Fields, harvest & yield', icon: Sprout, tone: 'bg-green-50 text-green-800', to: '/dashboard/production' },
-    { title: 'Dairy & production', subtitle: 'Daily output tracking', icon: Milk, tone: 'bg-teal-50 text-teal-800', to: '/dashboard/production' },
-    { title: 'Inventory & feed', subtitle: 'Stock and supplies', icon: Package, tone: 'bg-amber-50 text-amber-800', to: '/dashboard/expenses' },
-    { title: 'Sales & distribution', subtitle: 'Orders and transactions', icon: ShoppingCart, tone: 'bg-cyan-50 text-cyan-800', to: '/dashboard/sales' },
+    { title: 'Habitats & Enclosures', subtitle: 'Capacity & occupancy', icon: Warehouse, tone: 'bg-teal-50 text-teal-800', to: '/dashboard/animals' },
+    { title: 'Production Tracking', subtitle: 'Milk, eggs & harvests', icon: Milk, tone: 'bg-blue-50 text-blue-800', to: '/dashboard/production' },
+    { title: 'Inventory & Supplies', subtitle: 'Feed, medicine & alerts', icon: Package, tone: 'bg-amber-50 text-amber-800', to: '/dashboard/inventory' },
+    { title: 'Sales & Invoices', subtitle: 'Wholesale revenue & bKash', icon: ShoppingCart, tone: 'bg-cyan-50 text-cyan-800', to: '/dashboard/sales' },
+    { title: 'Expenses & Costs', subtitle: 'Feed, supplies & fuel', icon: Wallet, tone: 'bg-rose-50 text-rose-800', to: '/dashboard/expenses' },
+    { title: 'Workers & Payroll', subtitle: 'Attendance & salaries', icon: Users, tone: 'bg-purple-50 text-purple-800', to: '/dashboard/workers' },
+    { title: 'Reports & Audits', subtitle: 'P&L statements & CSV/PDF', icon: FileSpreadsheet, tone: 'bg-lime-50 text-lime-800', to: '/dashboard/reports' },
   ]
 
   return (
-    <main className="min-w-0 space-y-6 bg-[#f5f8f2] p-4 text-slate-800 sm:p-6 xl:p-8">
-      {/* Header */}
+    <main className="dashboard-page min-w-0 space-y-6 p-4 text-slate-800 sm:p-6 xl:p-8">
+      {/* Top Header */}
       <header className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
-            Farm operations center
+          <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-800">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Farm Operations Center · {farm.farmName || farm.name || 'KhamarBari'}</span>
+            <span className="text-forest-300">|</span>
+            <span className="text-forest-600 font-mono font-normal">
+              {selectedBranchId === 'all' ? 'All Branches Consolidated' : `Branch ID: ${selectedBranchId}`}
+            </span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-forest-950">
             {t('dashboard.title')}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            {t('dashboard.subtitle')} <span className="text-emerald-700">·</span> Monitor livestock, poultry, crops, production and finances in one place.
+          <p className="mt-1 max-w-2xl text-xs sm:text-sm text-forest-600">
+            {t('dashboard.subtitle')} · Monitor livestock health, output velocity, stock sentry and finances.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 rounded-xl border border-forest-100 bg-white px-3 py-1.5 text-xs text-forest-700 shadow-2xs">
             <CalendarDays className="h-4 w-4 text-emerald-700" />
             <DateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
-          <Button asChild className="rounded-xl bg-emerald-700 shadow-sm hover:bg-emerald-800">
-            <Link to="/dashboard/animals"><Plus className="mr-2 h-4 w-4" />{t('quick.addAnimal')}</Link>
+
+          <Button asChild size="sm" className="rounded-xl bg-emerald-700 text-white shadow-xs hover:bg-emerald-800 font-semibold cursor-pointer">
+            <Link to="/dashboard/animals">
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t('quick.addAnimal')}
+            </Link>
           </Button>
         </div>
       </header>
 
-      {/* Operations banner */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#123f2b] via-[#17613b] to-[#25834b] p-6 text-white shadow-lg shadow-emerald-950/10 sm:p-8">
-        <div className="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full border border-white/10" />
-        <div className="pointer-events-none absolute -right-2 -top-12 h-48 w-48 rounded-full border border-white/10" />
-        <div className="pointer-events-none absolute bottom-[-5rem] right-1/4 h-48 w-48 rounded-full bg-lime-300/10 blur-3xl" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+      {/* Operations Executive Banner */}
+      <section className="dashboard-hero-banner p-6 sm:p-8 text-white relative">
+        {/* Ambient background glows */}
+        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-yellow-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl" />
+
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[1.25fr_1fr] lg:items-center">
           <div>
-            <Badge className="mb-4 border border-white/20 bg-white/10 text-lime-100 hover:bg-white/10">
-              <Activity className="mr-1.5 h-3.5 w-3.5" /> Live farm overview
-            </Badge>
-<h2 className="max-w-xl text-2xl font-bold leading-tight sm:text-3xl text-white">
-  Every part of your farm, <span className="text-lime-300">working in sync.</span>
-</h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-50/80">
-              A unified view of animal health, harvests, production, stock and cash flow—built to help your team spot issues early and make better decisions.
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-emerald-100 mb-4 backdrop-blur-xs">
+              <Sun className="h-3.5 w-3.5 text-yellow-300" />
+              <span>Real-Time Operational Telemetry</span>
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+              Every branch and habitat, <span className="text-fresh-300">synchronized.</span>
+            </h2>
+
+            <p className="mt-2.5 max-w-lg text-xs sm:text-sm text-emerald-100/80 leading-relaxed">
+              Consolidated livestock records, production collection, supplies velocity and net margin in Bangladeshi Taka.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button asChild className="rounded-xl bg-lime-300 font-semibold text-emerald-950 hover:bg-lime-200">
-                <Link to="/dashboard/production">View production <ArrowRight className="ml-2 h-4 w-4" /></Link>
+
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              <Button asChild size="sm" className="rounded-xl bg-fresh-400 font-bold text-forest-950 hover:bg-fresh-300 shadow-md cursor-pointer">
+                <Link to="/dashboard/production" className="flex items-center gap-1.5">
+                  <span>Log Production</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </Button>
-              <Button asChild variant="outline" className="rounded-xl border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white">
-                <Link to="/dashboard/sales">Review sales</Link>
+              <Button asChild size="sm" variant="outline" className="rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white font-semibold backdrop-blur-xs cursor-pointer">
+                <Link to="/dashboard/sales">View Sales Invoices</Link>
               </Button>
             </div>
           </div>
+
+          {/* 4 Dynamic Hero Metric Cards */}
           <div className="grid grid-cols-2 gap-3">
-            <HeroMetric icon={Beef} label="Total animals" value={Number(kpis.totalAnimals || 0).toLocaleString()} foot="Across registered herds" />
-            <HeroMetric icon={Egg} label="Today's output" value={`${Number(kpis.productionToday?.milk || 0).toLocaleString()} L`} foot="Milk production recorded" />
-            <HeroMetric icon={Wallet} label="30-day expenses" value={bdt(kpis.expenses30d)} foot="Operating costs" />
-            <HeroMetric icon={TrendingUp} label="30-day net profit" value={bdt(kpis.netProfit)} foot="Income minus expenses" />
+            <HeroMetric
+              icon={Beef}
+              label={t('kpi.totalAnimals')}
+              value={Number(kpis.totalAnimals || 0).toLocaleString()}
+              foot={kpis.totalCapacity ? `${kpis.utilizationRate}% of ${kpis.totalCapacity.toLocaleString()} max` : t('dashboard.stockFoot')}
+            />
+            <HeroMetric
+              icon={Egg}
+              label={t('kpi.productionToday')}
+              value={`${Number(kpis.productionToday?.milk || 0).toLocaleString()} L`}
+              foot={`${Number(kpis.productionToday?.eggs || 0).toLocaleString()} eggs collected`}
+            />
+            <HeroMetric
+              icon={Wallet}
+              label={t('dashboard.periodExpenses', { range: t(`range.${dateRange}`) })}
+              value={bdt(kpis.expenses30d)}
+              foot="Feed, health & operations"
+            />
+            <HeroMetric
+              icon={TrendingUp}
+              label={t('dashboard.periodNet', { range: t(`range.${dateRange}`) })}
+              value={bdt(kpis.netProfit)}
+              foot={kpis.netProfit >= 0 ? 'Net profit surplus' : 'Operating deficit'}
+              isPositive={kpis.netProfit >= 0}
+            />
           </div>
         </div>
       </section>
 
-      {/* At-a-glance stats */}
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {/* At-a-Glance Stat Row */}
+      <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
         <MiniMetric icon={Users} label={t('kpi.male')} value={kpis.male} />
         <MiniMetric icon={Users} label={t('kpi.female')} value={kpis.female} />
-        <MiniMetric icon={Stethoscope} label={t('kpi.sick')} value={kpis.sick} warning />
-        <MiniMetric icon={Activity} label={t('kpi.birthsDeaths')} value={`${kpis.births30d} / ${kpis.deaths30d}`} />
+        <MiniMetric icon={Leaf} label={t('kpi.healthy')} value={kpis.healthy} />
+        <MiniMetric icon={Stethoscope} label={t('kpi.sick')} value={kpis.sick} warning={kpis.sick > 0} />
+        <MiniMetric icon={Activity} label="Births / Deaths" value={`${kpis.births30d || 0} / ${kpis.deaths30d || 0}`} />
+        <MiniMetric icon={Users} label="Active Workforce" value={`${kpis.activeWorkers || 0} / ${kpis.totalWorkers || 0}`} />
+        <MiniMetric icon={Package} label="Low Stock Items" value={kpis.lowStockCount || 0} warning={kpis.lowStockCount > 0} />
       </section>
 
-      {/* Business modules */}
-      <section className="space-y-3">
-        <SectionHeading eyebrow="Connected modules" title="Manage every operation" note="Move between the core areas of your farm." />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Main Diagrams Section (Grid of 4 Advanced Diagrams) */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+              OPERATIONAL TELEMETRY & DIAGRAMS
+            </span>
+            <h2 className="text-xl font-extrabold text-forest-950">Farm Performance Analytics</h2>
+          </div>
+          <span className="text-xs font-semibold text-forest-600 bg-white px-3 py-1.5 rounded-xl border border-forest-100 shadow-2xs">
+            Live Database Synced
+          </span>
+        </div>
+
+        {/* Row 1: Cash Flow & Health Gauge */}
+        <div className="grid gap-5 lg:grid-cols-[1.55fr_1fr]">
+          {/* Diagram 1: Cash Flow */}
+          <Card className="dashboard-stat-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-forest-100/70 bg-[#fbfdf9] px-5 py-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Financial Telemetry</span>
+                <CardTitle className="text-base font-bold text-forest-950 mt-0.5">{t('chart.incomeVsExpense')}</CardTitle>
+              </div>
+              <Badge variant="outline" className="rounded-lg border-emerald-200 bg-emerald-50 text-emerald-800 font-mono text-xs">
+                Range: {dateRange}
+              </Badge>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              <IncomeExpenseChart data={incomeVsExpense} />
+            </CardContent>
+          </Card>
+
+          {/* Diagram 2: Animal Wellbeing Radial Gauge */}
+          <Card className="dashboard-stat-card overflow-hidden">
+            <CardContent className="p-0">
+              <HealthPieChart
+                data={healthBreakdown}
+                title={t('chart.health')}
+                unit={t('dashboard.animalUnit')}
+                scopeLabel={selectedBranchId === 'all' ? t('branch.all') : t('dashboard.branchScoped', 'Selected branch')}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 2: Production Trend & Habitat Capacity Radar */}
+        <div className="grid gap-5 lg:grid-cols-[1.3fr_1.1fr]">
+          {/* Diagram 3: 14-Day Production Output Waveform */}
+          <Card className="dashboard-stat-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-forest-100/70 bg-[#fbfdf9] px-5 py-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Harvest Telemetry</span>
+                <CardTitle className="text-base font-bold text-forest-950 mt-0.5">{t('chart.productionTrend')}</CardTitle>
+              </div>
+              <Link
+                to="/dashboard/production"
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900"
+              >
+                <span>{t('common.viewAll')}</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              <ProductionTrendChart data={productionTrend} />
+            </CardContent>
+          </Card>
+
+          {/* Diagram 4: Habitat Utilization & Enclosure Capacity */}
+          <Card className="dashboard-stat-card overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-forest-100/70 bg-[#fbfdf9] px-5 py-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Habitats & Capacity</span>
+                <CardTitle className="text-base font-bold text-forest-950 mt-0.5">Enclosure Occupancy Radar</CardTitle>
+              </div>
+              <Link
+                to="/dashboard/animals"
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900"
+              >
+                <span>Manage</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              <HabitatUtilizationChart enclosures={enclosures} />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Connected Modules Grid */}
+      <section className="space-y-3 pt-2">
+        <SectionHeading
+          eyebrow="Integrated Farm Modules"
+          title="Direct Operation Management"
+          note="Navigate across all farm operational departments."
+        />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {modules.map((module) => (
             <Link
               key={module.title}
               to={module.to}
-              className="group flex items-center gap-4 rounded-2xl border border-emerald-100/80 bg-white p-4 shadow-sm shadow-emerald-950/[0.02] transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+              className="dashboard-module-card group flex items-center gap-3.5 p-3.5"
             >
-              <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl', module.tone)}>
+              <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', module.tone)}>
                 <module.icon className="h-5 w-5" />
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-slate-800">{module.title}</span>
-                <span className="mt-1 block text-xs text-slate-500">{module.subtitle}</span>
-              </span>
-              <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+              <div className="min-w-0 flex-1">
+                <span className="block text-xs font-bold text-forest-950">{module.title}</span>
+                <span className="block text-[11px] text-forest-500 mt-0.5 truncate">{module.subtitle}</span>
+              </div>
+              <ArrowRight className="h-4 w-4 text-forest-300 transition-transform group-hover:translate-x-1 group-hover:text-emerald-700" />
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Analytics */}
-      <section className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-        <Card className="overflow-hidden rounded-2xl border-emerald-100/80 bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Financial performance</p>
-              <CardTitle className="mt-1 text-lg text-slate-900">{t('chart.incomeVsExpense')}</CardTitle>
-            </div>
-            <Badge variant="outline" className="rounded-lg border-emerald-100 bg-emerald-50 text-emerald-800">{dateRange}</Badge>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            <IncomeExpenseChart data={incomeVsExpense} />
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl border-emerald-100/80 bg-white shadow-sm">
-          <CardHeader className="px-5 pb-0 pt-5 sm:px-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Animal wellbeing</p>
-            <CardTitle className="mt-1 text-lg text-slate-900">{t('chart.health')}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            <HealthPieChart data={healthBreakdown} />
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-xs text-emerald-900">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
-              Track health status and follow up on animals that need attention.
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      {/* Activity Logs & Needs Attention Section */}
+      <section className="grid gap-5 xl:grid-cols-3 pt-2">
+        {/* Real Farm Activity Log */}
+        {showDashboardAlerts && (
+          <Card className="dashboard-stat-card xl:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-forest-100/70 px-5 py-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Audit Trail</span>
+                <CardTitle className="text-base font-bold text-forest-950 mt-0.5">{t('panel.recentActivity')}</CardTitle>
+              </div>
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+                <Clock3 className="h-4 w-4" />
+              </span>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              {activity.length === 0 ? (
+                <EmptyState title={t('empty.noActivity')} />
+              ) : (
+                <ul className="space-y-3">
+                  {activity.slice(0, 5).map((item) => (
+                    <li key={item.id} className="flex gap-3 items-start border-b border-forest-50 pb-2.5 last:border-0 last:pb-0">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 mt-0.5">
+                        <Activity className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="min-w-0 flex-1 text-xs">
+                        <p className="font-semibold text-forest-950 leading-snug">{item.title}</p>
+                        <p className="text-[10px] text-forest-400 mt-0.5">{item.time}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-      <Card className="overflow-hidden rounded-2xl border-emerald-100/80 bg-white shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Output over time</p>
-            <CardTitle className="mt-1 text-lg text-slate-900">{t('chart.productionTrend')}</CardTitle>
-          </div>
-          <Link to="/dashboard/production" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900">
-            {t('common.viewAll')} <ArrowRight className="h-4 w-4" />
-          </Link>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <ProductionTrendChart data={productionTrend} />
-        </CardContent>
-      </Card>
-
-      {/* Activity and response */}
-      <section className="grid gap-4 xl:grid-cols-3">
-        <Card className="rounded-2xl border-emerald-100/80 bg-white shadow-sm xl:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between px-5 pb-2 pt-5">
+        {/* Real Needs Attention Alerts */}
+        <Card className="dashboard-stat-card xl:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-forest-100/70 px-5 py-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Farm log</p>
-              <CardTitle className="mt-1 text-lg text-slate-900">{t('panel.recentActivity')}</CardTitle>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Health & Inventory Watch</span>
+              <CardTitle className="text-base font-bold text-forest-950 mt-0.5">{t('panel.alerts')}</CardTitle>
             </div>
-            <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><Clock3 className="h-4 w-4" /></span>
-          </CardHeader>
-          <CardContent className="px-5 pb-5 pt-3">
-            {activity.length === 0 ? (
-              <EmptyState title={t('empty.noActivity')} />
-            ) : (
-              <ul className="space-y-4">
-                {activity.slice(0, 5).map((item, index) => (
-                  <li key={item.id} className="flex gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                      <Activity className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1 border-b border-slate-100 pb-3 last:border-0">
-                      <p className="text-sm font-medium text-slate-800">{item.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">{item.time}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl border-emerald-100/80 bg-white shadow-sm xl:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between px-5 pb-2 pt-5">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Needs attention</p>
-              <CardTitle className="mt-1 text-lg text-slate-900">{t('panel.alerts')}</CardTitle>
-            </div>
-            <span className={cn('rounded-xl p-2', highAlerts ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700')}>
+            <span className={cn('grid h-7 w-7 place-items-center rounded-lg', highAlerts ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700')}>
               <AlertTriangle className="h-4 w-4" />
             </span>
           </CardHeader>
-          <CardContent className="px-5 pb-5 pt-3">
-            {alerts.length === 0 ? (
+          <CardContent className="p-4 sm:p-5">
+            {alertError ? (
+              <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-900">
+                Alerts could not be loaded: {alertError}
+              </div>
+            ) : alerts.length === 0 ? (
               <EmptyState title={t('empty.noAlerts')} />
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-2.5">
                 {alerts.slice(0, 5).map((alert) => (
-                  <li key={alert.id} className="flex gap-3 rounded-xl border border-slate-100 p-3">
-                    <span className={cn(
-                      'mt-0.5 h-2 w-2 shrink-0 rounded-full',
-                      alert.severity === 'high' ? 'bg-red-500' : alert.severity === 'medium' ? 'bg-amber-500' : 'bg-emerald-500',
-                    )} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800">{alert.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{alert.detail}</p>
-                    </div>
+                  <li key={alert.id}>
+                    <Link
+                      to={alert.href || '/dashboard/animals'}
+                      className="group flex gap-2.5 rounded-xl border border-forest-100/70 bg-white p-2.5 text-xs transition-all hover:border-emerald-200 hover:bg-emerald-50/30 hover:shadow-sm"
+                    >
+                      <span className={cn(
+                        'mt-1 h-2 w-2 shrink-0 rounded-full',
+                        alert.severity === 'high' ? 'bg-rose-500 ring-4 ring-rose-100' : alert.severity === 'medium' ? 'bg-amber-500 ring-4 ring-amber-100' : 'bg-emerald-500 ring-4 ring-emerald-100',
+                      )} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-bold text-forest-950 group-hover:text-emerald-800">{alert.title}</p>
+                          <span className={cn(
+                            'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                            alert.severity === 'high' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700',
+                          )}>
+                            {alert.severity === 'high' ? 'Urgent' : 'Monitor'}
+                          </span>
+                        </div>
+                        {alert.detail && <p className="mt-1 text-[11px] leading-relaxed text-forest-500">{alert.detail}</p>}
+                      </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -312,12 +445,18 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-emerald-100/80 bg-white shadow-sm">
-          <CardHeader className="px-5 pb-2 pt-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Shortcuts</p>
-            <CardTitle className="mt-1 text-lg text-slate-900">{t('panel.quickActions')}</CardTitle>
+        {/* Quick Operational Shortcuts */}
+        <Card className="dashboard-stat-card">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-forest-100/70 px-5 py-4">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Fast Entry</span>
+              <CardTitle className="text-base font-bold text-forest-950 mt-0.5">{t('panel.quickActions')}</CardTitle>
+            </div>
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+              <Zap className="h-4 w-4" />
+            </span>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 px-5 pb-5 pt-3">
+          <CardContent className="grid grid-cols-2 gap-2.5 p-4 sm:p-5">
             <QuickAction to="/dashboard/animals" icon={Beef} label={t('quick.addAnimal')} />
             <QuickAction to="/dashboard/expenses" icon={Wallet} label={t('quick.addExpense')} />
             <QuickAction to="/dashboard/sales" icon={ShoppingCart} label={t('quick.recordSale')} />
@@ -329,28 +468,32 @@ export default function DashboardPage() {
   )
 }
 
-function HeroMetric({ icon: Icon, label, value, foot }) {
+function HeroMetric({ icon: Icon, label, value, foot, isPositive = true }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.09] p-4 backdrop-blur-sm">
+    <div className="dashboard-hero-metric p-3.5 sm:p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-emerald-50/80">{label}</span>
-        <Icon className="h-4 w-4 text-lime-300" />
+        <span className="text-[11px] font-semibold text-emerald-100/80">{label}</span>
+        <Icon className="h-4 w-4 text-fresh-300" />
       </div>
-      <p className="mt-3 break-words text-xl font-bold tracking-tight text-white sm:text-2xl">{value}</p>
-      <p className="mt-1 text-[11px] text-emerald-50/60">{foot}</p>
+      <p className="mt-2 break-words text-xl sm:text-2xl font-black font-mono tracking-tight text-white">
+        {value}
+      </p>
+      <p className="mt-1 text-[10px] text-emerald-200/70 truncate">{foot}</p>
     </div>
   )
 }
 
 function MiniMetric({ icon: Icon, label, value, warning = false }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-emerald-100/80 bg-white p-4 shadow-sm shadow-emerald-950/[0.02]">
-      <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', warning ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>
+    <div className="dashboard-stat-card flex items-center gap-3 p-3">
+      <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', warning ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-800')}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium text-slate-500">{label}</p>
-        <p className={cn('mt-1 text-xl font-bold tabular-nums', warning ? 'text-amber-700' : 'text-slate-900')}>{value ?? 0}</p>
+        <p className="truncate text-[10px] font-bold uppercase tracking-wider text-forest-500">{label}</p>
+        <p className={cn('mt-0.5 text-base sm:text-lg font-black font-mono tabular-nums', warning ? 'text-amber-800' : 'text-forest-950')}>
+          {value ?? '—'}
+        </p>
       </div>
     </div>
   )
@@ -358,12 +501,12 @@ function MiniMetric({ icon: Icon, label, value, warning = false }) {
 
 function SectionHeading({ eyebrow, title, note }) {
   return (
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">{eyebrow}</p>
-        <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-900">{title}</h2>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">{eyebrow}</p>
+        <h2 className="text-lg font-extrabold text-forest-950">{title}</h2>
       </div>
-      <p className="text-sm text-slate-500">{note}</p>
+      <p className="text-xs text-forest-500">{note}</p>
     </div>
   )
 }
@@ -372,14 +515,14 @@ function QuickAction({ to, icon: Icon, label }) {
   return (
     <Link
       to={to}
-      className="group flex min-h-24 flex-col items-start justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3 transition hover:border-emerald-300 hover:bg-emerald-50"
+      className="group flex flex-col justify-between p-3 rounded-xl border border-forest-100 bg-[#fbfdf9] hover:border-emerald-300 hover:bg-forest-50/50 transition-all shadow-2xs"
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm">
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-100 text-emerald-800 mb-2 group-hover:scale-105 transition-transform">
         <Icon className="h-4 w-4" />
       </span>
-      <span className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold text-slate-700">
-        {label}
-        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-emerald-700 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+      <span className="flex items-center justify-between text-xs font-bold text-forest-900">
+        <span>{label}</span>
+        <ArrowUpRight className="h-3 w-3 text-emerald-600 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
       </span>
     </Link>
   )
@@ -402,10 +545,10 @@ function DateRangePicker({ value, onChange }) {
           type="button"
           onClick={() => onChange(option.v)}
           className={cn(
-            'rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:px-3',
+            'rounded-lg px-2 py-1 text-xs font-semibold transition cursor-pointer',
             value === option.v
-              ? 'bg-emerald-700 text-white shadow-sm'
-              : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-800',
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-forest-600 hover:bg-forest-50 hover:text-emerald-900',
           )}
         >
           {option.label}

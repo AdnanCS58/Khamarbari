@@ -8,22 +8,28 @@ import AuthLayout from '@/components/layout/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { requestPasswordReset } from '@/services/authService'
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation()
   const [sent, setSent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [serverError, setServerError] = useState('')
 
   const schema = z.object({
     contact: z.string().regex(/^01[3-9]\d{8}$/, t('errors.mobile')),
   })
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) })
 
-    const onSubmit = async ({ contact }) => {
+  const onSubmit = async ({ contact }) => {
     setSubmitting(true)
-    // Mock request for now
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    setServerError('')
+    const { error } = await requestPasswordReset(contact)
     setSubmitting(false)
+    if (error) {
+      setServerError(error)
+      return
+    }
     setSent(true)
   }
 
@@ -40,6 +46,11 @@ export default function ForgotPasswordPage() {
         </div>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          {serverError && (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {serverError}
+            </div>
+          )}
           <div>
             <Label>{t('auth.login.contact')}</Label>
             <Input {...register('contact')} className="mt-1.5" inputMode="tel" placeholder="01712345678" />

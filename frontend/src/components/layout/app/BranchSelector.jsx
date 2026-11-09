@@ -13,17 +13,27 @@ import { cn } from '@/lib/utils'
 export default function BranchSelector() {
   const { t } = useTranslation()
   const farm = useAuthStore((s) => s.farm)
-  const { selectedBranchId, setBranch } = useAppStore()
+  const user = useAuthStore((s) => s.user)
+  const selectedBranchId = useAppStore((s) => s.selectedBranchId)
+  const setBranch = useAppStore((s) => s.setBranch)
+  const branchRevision = useAppStore((s) => s.branchRevision)
   const [branches, setBranches] = useState([])
 
   useEffect(() => {
     if (!farm) return
     listBranches(farm.id).then(({ data }) => setBranches(data || []))
-  }, [farm])
+  }, [farm?.id, branchRevision])
 
-  const current = selectedBranchId === 'all'
+  useEffect(() => {
+    if (user?.role === 'manager' && user.branchId) setBranch(user.branchId)
+  }, [user?.role, user?.branchId, setBranch])
+
+  const canViewAll = user?.role !== 'manager' || !user.branchId
+  const visibleBranches = canViewAll ? branches : branches.filter((branch) => branch.id === user.branchId)
+
+  const current = canViewAll && selectedBranchId === 'all'
     ? { name: t('branch.all') }
-    : branches.find((b) => b.id === selectedBranchId) || { name: t('branch.all') }
+    : visibleBranches.find((branch) => branch.id === selectedBranchId) || { name: t('branch.all') }
 
   return (
     <DropdownMenu>
@@ -36,21 +46,23 @@ export default function BranchSelector() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuLabel>{t('branch.select')}</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={() => setBranch('all')}>
-          <Check className={cn('h-4 w-4', selectedBranchId === 'all' ? 'opacity-100' : 'opacity-0')} />
-          <span className="font-medium">{t('branch.all')}</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {branches.map((b) => (
-          <DropdownMenuItem key={b.id} onSelect={() => setBranch(b.id)}>
-            <Check className={cn('h-4 w-4', selectedBranchId === b.id ? 'opacity-100' : 'opacity-0')} />
+        {canViewAll && <>
+          <DropdownMenuItem onSelect={() => setBranch('all')}>
+            <Check className={cn('h-4 w-4', selectedBranchId === 'all' ? 'opacity-100' : 'opacity-0')} />
+            <span className="font-medium">{t('branch.all')}</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>}
+        {visibleBranches.map((branch) => (
+          <DropdownMenuItem key={branch.id} onSelect={() => setBranch(branch.id)}>
+            <Check className={cn('h-4 w-4', selectedBranchId === branch.id ? 'opacity-100' : 'opacity-0')} />
             <div className="flex flex-col">
-              <span>{b.name}</span>
-              <span className="text-xs text-forest-700/60">{b.location}</span>
+              <span>{branch.name}</span>
+              <span className="text-xs text-forest-700/60">{branch.location}</span>
             </div>
           </DropdownMenuItem>
         ))}
-        {branches.length === 0 && (
+        {visibleBranches.length === 0 && (
           <div className="px-3 py-2 text-xs text-forest-700/60">{t('branch.none')}</div>
         )}
       </DropdownMenuContent>

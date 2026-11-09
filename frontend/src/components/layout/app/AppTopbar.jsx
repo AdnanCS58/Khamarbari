@@ -19,7 +19,11 @@ export default function AppTopbar() {
   const user = useAuthStore((s) => s.user)
   const farm = useAuthStore((s) => s.farm)
   const logout = useAuthStore((s) => s.logout)
+  const setBranch = useAppStore((s) => s.setBranch)
+  const refreshBranches = useAppStore((s) => s.refreshBranches)
+  const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
   const [branchOpen, setBranchOpen] = useState(false)
 
   const onLogout = async () => {
@@ -30,38 +34,58 @@ export default function AppTopbar() {
   const initials = (user?.name || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-forest-50 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-30 h-[4.5rem] border-b border-forest-100/70 bg-cream/85 shadow-[0_3px_18px_rgba(17,45,28,0.04)] backdrop-blur-xl">
       <div className="h-full px-4 flex items-center gap-3">
-        <button className="md:hidden p-2 rounded-lg hover:bg-sage" onClick={toggleSidebar} aria-label="Menu">
+        <button
+          className="grid h-10 w-10 place-items-center rounded-xl border border-forest-100 bg-white text-forest-800 shadow-sm transition-all hover:bg-forest-50 active:scale-95"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.innerWidth < 768) {
+              toggleSidebar()
+            } else {
+              toggleSidebarCollapsed()
+            }
+          }}
+          aria-label={t('sidebar.toggle', 'Toggle navigation')}
+          aria-expanded={sidebarOpen}
+          title={t('sidebar.toggle', 'Toggle navigation')}
+        >
           <Menu className="h-5 w-5" />
         </button>
 
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex min-w-0 items-center gap-3">
           {farm?.logo ? (
-            <img src={farm.logo} alt="" className="h-8 w-8 rounded-lg object-cover border border-forest-50" />
+            <img src={farm.logo} alt="" className="h-14 w-14 rounded-xl border border-forest-200 object-cover shadow-xs" />
           ) : (
-            <img src="/sprout.svg" alt="" className="h-8 w-8" />
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#dcf88f] to-[#bce86f] ring-1 ring-forest-200/50 shadow-[0_2px_10px_rgba(181,230,97,0.35)]">
+              <img src="/sprout.svg" alt="KhamarBari" className="h-12 w-12 drop-shadow-xs" />
+            </div>
           )}
           <div className="hidden sm:block min-w-0">
-            <p className="text-sm font-semibold text-forest-900 truncate max-w-[180px]">{farm?.name}</p>
-            <p className="text-[11px] text-forest-700/60 capitalize">{user?.role}</p>
+            <p className="max-w-[180px] truncate text-sm font-bold text-forest-900">{farm?.name}</p>
+            <p className="text-[11px] font-medium capitalize text-forest-700/70">{user?.role}</p>
           </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
           <div className="hidden md:block"><BranchSelector /></div>
 
-          <Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={() => setBranchOpen(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden lg:inline">{t('branch.new')}</span>
-          </Button>
+          {['owner', 'admin'].includes(user?.role) && (
+            <Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={() => setBranchOpen(true)}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden lg:inline">{t('branch.new')}</span>
+            </Button>
+          )}
 
           <LanguageToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-9 w-9 rounded-full bg-forest text-white text-xs font-semibold flex items-center justify-center hover:opacity-90">
-                {initials}
+              <button className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-forest text-xs font-semibold text-white shadow-[0_0_0_1px_rgba(156,201,180,0.7),0_4px_12px_rgba(15,61,46,0.16)] transition-transform hover:scale-105">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt={user.name || 'User'} className="h-full w-full object-cover" />
+                ) : (
+                  <span>{initials}</span>
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -96,7 +120,14 @@ export default function AppTopbar() {
         </div>
       </div>
 
-      <CreateBranchDialog open={branchOpen} onOpenChange={setBranchOpen} />
+      <CreateBranchDialog
+        open={branchOpen}
+        onOpenChange={setBranchOpen}
+        onCreated={(branch) => {
+          refreshBranches()
+          if (branch?.id) setBranch(branch.id)
+        }}
+      />
     </header>
   )
 }

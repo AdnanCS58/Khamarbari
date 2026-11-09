@@ -219,10 +219,12 @@ function OverviewTab({ data, bdt, t }) {
         <MiniKpi label={t('reports.profitMargin')} value={`${data.profitMargin.toFixed(1)}%`} />
         <MiniKpi label={t('reports.inventoryValue')} value={bdt(data.inventoryValue)} />
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MiniKpi label={t('reports.activeWorkers')} value={`${data.activeWorkers} / ${data.totalWorkers}`} />
         <MiniKpi label={t('reports.monthlySalary')} value={bdt(data.monthlySalary)} />
         <MiniKpi label={t('reports.lowStock')} value={data.lowStockCount} warning={data.lowStockCount > 0} />
+        <MiniKpi label={t('reports.enclosures')} value={data.enclosures} />
+        <MiniKpi label={t('reports.occupancy')} value={`${data.occupancy.toLocaleString()} / ${data.capacity.toLocaleString()}`} />
       </div>
     </div>
   )

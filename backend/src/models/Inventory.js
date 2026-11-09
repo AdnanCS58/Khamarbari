@@ -1,5 +1,18 @@
 import mongoose from 'mongoose'
 
+const movementSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['purchase', 'usage', 'adjustment', 'transfer'], required: true },
+    quantity: { type: Number, min: 0, required: true },
+    unit: { type: String, required: true },
+    date: { type: String, required: true },
+    reference: { type: String, default: '' },
+    recordedBy: { type: String, default: '' },
+    notes: { type: String, default: '' },
+  },
+  { timestamps: true }
+)
+
 const inventorySchema = new mongoose.Schema(
   {
     farmId: { type: mongoose.Schema.Types.ObjectId, ref: 'Farm', required: true, index: true },
@@ -13,6 +26,8 @@ const inventorySchema = new mongoose.Schema(
     unitPrice: { type: Number, default: 0, min: 0 },
     supplier: { type: String, trim: true },
     expiryDate: { type: String, default: null },
+    notes: { type: String, default: '' },
+    movements: { type: [movementSchema], default: [] },
   },
   { timestamps: true }
 )

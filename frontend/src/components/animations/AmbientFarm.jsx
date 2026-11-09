@@ -1,19 +1,21 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Leaf } from 'lucide-react'
 
 export default function AmbientFarm() {
+  const reducedMotion = useReducedMotion()
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-gradient-to-br from-yellow-200/70 to-transparent blur-2xl animate-sunrise" />
 
       <motion.div
         className="absolute top-10 left-0 h-10 w-40 rounded-full bg-white/70 blur-sm"
-        animate={{ x: ['-10%', '110%'] }}
+        animate={reducedMotion ? undefined : { x: ['-10%', '110%'] }}
         transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
       />
       <motion.div
         className="absolute top-24 left-0 h-8 w-28 rounded-full bg-white/60 blur-sm"
-        animate={{ x: ['-10%', '110%'] }}
+        animate={reducedMotion ? undefined : { x: ['-10%', '110%'] }}
         transition={{ duration: 80, repeat: Infinity, ease: 'linear', delay: 10 }}
       />
 

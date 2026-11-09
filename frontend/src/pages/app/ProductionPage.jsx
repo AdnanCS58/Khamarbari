@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Plus, Search, Pencil, Trash2, Milk, Egg, Weight, Heart, Baby, Skull,
-  Wheat, AlertTriangle, Download, TrendingUp, Activity,
+  Wheat, AlertTriangle, Download, TrendingUp, Activity, Ham,
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,7 @@ import { PRODUCTION_TYPES, SESSIONS } from '@/lib/productionTypes'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 12
-const ICON_MAP = { Milk, Egg, Weight, Heart, Baby, Skull, Wheat }
+const ICON_MAP = { Milk, Egg, Weight, Heart, Baby, Skull, Wheat, Ham }
 
 export default function ProductionPage() {
   const { t, i18n } = useTranslation()
@@ -71,18 +71,24 @@ export default function ProductionPage() {
 
   const onDelete = async () => {
     setConfirm((c) => ({ ...c, loading: true }))
-    await deleteProduction(confirm.row.id)
+    const result = await deleteProduction(confirm.row.id)
+    if (result.error) {
+      setError(result.error)
+      setConfirm((current) => ({ ...current, loading: false }))
+      return
+    }
     setConfirm({ open: false, row: null, loading: false })
+    window.dispatchEvent(new CustomEvent('khamar:enclosures-changed'))
     refresh()
   }
 
   const exportCsv = () => {
-    const header = ['Date', 'Type', 'Animal', 'Session', 'Quantity', 'Unit', 'Quality', 'Recorder', 'Notes']
+    const header = ['Date', 'Type', 'Enclosure', 'Animal', 'Session', 'Quantity', 'Unit', 'Meat Yield (kg)', 'Quality', 'Recorder', 'Notes']
     const lines = [header.join(',')]
     rows.forEach((r) => {
       lines.push([
-        r.date, r.type, `"${r.animalName || ''}"`, r.session || '', r.quantity, r.unit, r.quality || '',
-        `"${r.recorder || ''}"`, `"${(r.notes || '').replace(/"/g, '""')}"`,
+        r.date, r.type, `"${r.enclosureName || ''}"`, `"${r.animalName || ''}"`, r.session || '', r.quantity, r.unit, r.meatYieldKg || '',
+        r.quality || '', `"${r.recorder || ''}"`, `"${(r.notes || '').replace(/"/g, '""')}"`,
       ].join(','))
     })
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
@@ -195,8 +201,9 @@ export default function ProductionPage() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">{t('production.date')}</th>
                     <th className="px-4 py-3 font-semibold">{t('production.type')}</th>
-                    <th className="px-4 py-3 font-semibold">{t('production.animal')}</th>
+                    <th className="px-4 py-3 font-semibold">Habitat / Animal</th>
                     <th className="px-4 py-3 text-right font-semibold">{t('production.quantity')}</th>
+                    <th className="px-4 py-3 text-right font-semibold">Meat Yield</th>
                     <th className="px-4 py-3 font-semibold">{t('production.session')}</th>
                     <th className="px-4 py-3 font-semibold">{t('production.recorder')}</th>
                     <th className="px-4 py-3"></th>
@@ -218,8 +225,21 @@ export default function ProductionPage() {
                             {p?.label || r.type}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-forest-700/80">{r.animalName || '—'}</td>
+                        <td className="px-4 py-3 text-forest-700/80">
+                          <div className="font-medium text-forest-950">{r.enclosureName || r.animalName || '—'}</div>
+                          {r.enclosureName && r.animalName && (
+                            <div className="text-[11px] text-forest-500 font-normal">{r.animalName}</div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right font-semibold tabular-nums">{fmt(r.quantity, r.unit)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-xs">
+                          {r.meatYieldKg ? (
+                            <span className="inline-flex items-center gap-1 text-red-700 font-semibold capitalize">
+                              <Ham className="h-3 w-3" />
+                              {r.meatType ? `${r.meatType.replace('_', ' ')} · ` : ''}{r.meatYieldKg} kg
+                            </span>
+                          ) : <span className="text-forest-700/40">—</span>}
+                        </td>
                         <td className="px-4 py-3 text-xs text-forest-700/60">{sess?.label || '—'}</td>
                         <td className="px-4 py-3 text-xs text-forest-700/60">{r.recorder || '—'}</td>
                         <td className="px-4 py-3 text-right">
@@ -260,7 +280,10 @@ export default function ProductionPage() {
         open={dialogOpen}
         onOpenChange={(o) => { setDialogOpen(o); if (!o) setEditing(null) }}
         editing={editing}
-        onSaved={refresh}
+        onSaved={() => {
+          window.dispatchEvent(new CustomEvent('khamar:enclosures-changed'))
+          refresh()
+        }}
       />
 
       <ConfirmDialog

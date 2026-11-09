@@ -8,6 +8,8 @@ import productionRoutes from './productionRoutes.js'
 import inventoryRoutes from './inventoryRoutes.js'
 import utilityRoutes from './utilityRoutes.js'
 import workerRoutes from './workerRoutes.js'
+import farmRoutes from './farmRoutes.js'
+import enclosureRoutes from './enclosureRoutes.js'
 
 const router = Router()
 
@@ -16,6 +18,8 @@ router.get('/health', (req, res) => {
 })
 
 router.use('/auth', authRoutes)
+router.use('/farms', farmRoutes)
+router.use('/enclosures', enclosureRoutes)
 router.use('/branches', branchRoutes)
 router.use('/animals', animalRoutes)
 router.use('/expenses', expenseRoutes)

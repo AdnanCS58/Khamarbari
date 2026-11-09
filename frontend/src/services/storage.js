@@ -1,4 +1,4 @@
-// Thin, namespaced localStorage wrapper. Mock-only.
+// Namespaced localStorage for the session token and browser-only preferences.
 const NS = 'khamar'
 
 export const storage = {

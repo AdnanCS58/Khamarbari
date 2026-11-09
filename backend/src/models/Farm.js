@@ -3,6 +3,8 @@ import mongoose from 'mongoose'
 const farmSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    tagline: { type: String, trim: true, default: '' },
+    farmType: { type: String, trim: true, default: '' },
     logo: { type: String, default: null },
     license: { type: String, required: true, trim: true },
     division: { type: String, required: true },

@@ -17,6 +17,7 @@ import InventoryPage from '@/pages/app/InventoryPage'
 import UtilitiesPage from '@/pages/app/UtilitiesPage'
 import WorkersPage from '@/pages/app/WorkersPage'
 import ReportsPage from '@/pages/app/ReportsPage'
+import BranchesPage from '@/pages/app/BranchesPage'
 import SettingsPage from '@/pages/app/SettingsPage'
 import ProfilePage from '@/pages/app/ProfilePage'
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'animals', element: <AnimalsPage /> },
+      { path: 'branches', element: <BranchesPage /> },
       { path: 'expenses', element: <ExpensesPage /> },
       { path: 'sales', element: <SalesPage /> },
       { path: 'production', element: <ProductionPage /> },

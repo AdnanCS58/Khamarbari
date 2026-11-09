@@ -1,214 +1,219 @@
-import { storage } from './storage'
+import { listAnimals } from './animalsService'
+import { listExpenses } from './expensesService'
+import { listItems } from './inventoryService'
+import { listProduction } from './productionService'
+import { listSales } from './salesService'
+import { listUtilities } from './utilitiesService'
+import { listAttendance, listPayments, listWorkers } from './workersService'
 
-const delay = (ms = 300) => new Promise((r) => setTimeout(r, ms))
+const isInDateRange = (record, from, to) => Boolean(record.date)
+  && (!from || record.date >= from)
+  && (!to || record.date <= to)
 
-const read = (key) => storage.get(key, [])
-const within = (dateStr, from, to) => {
-  if (!dateStr) return false
-  if (from && dateStr < from) return false
-  if (to && dateStr > to) return false
-  return true
-}
-const filterBy = (rows, { farmId, branchId }) =>
-  rows.filter((r) => r.farmId === farmId && (branchId === 'all' || r.branchId === branchId))
-
-// ─────────── OVERVIEW (all KPIs at once) ───────────
-export async function getOverview({ farmId, branchId, dateFrom, dateTo } = {}) {
-  await delay()
-
-  const sales = filterBy(read('sales'), { farmId, branchId }).filter((s) => within(s.date, dateFrom, dateTo))
-  const expenses = filterBy(read('expenses'), { farmId, branchId }).filter((e) => within(e.date, dateFrom, dateTo))
-  const production = filterBy(read('production'), { farmId, branchId }).filter((p) => within(p.date, dateFrom, dateTo))
-  const utilities = filterBy(read('utilities'), { farmId, branchId }).filter((u) => within(u.billingPeriod, dateFrom?.slice(0, 7), dateTo?.slice(0, 7)))
-  const inventory = filterBy(read('inventory_items'), { farmId, branchId })
-  const workers = filterBy(read('workers'), { farmId, branchId })
-  const animals = filterBy(read('animals'), { farmId, branchId })
-
-  const revenue = sales.reduce((s, r) => s + (r.total || 0), 0)
-  const collected = sales.reduce((s, r) => s + (r.paidAmount || 0), 0)
-  const receivables = revenue - collected
-
-  const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0)
-  const totalUtilities = utilities.reduce((s, u) => s + (u.amount || 0), 0)
-  const totalExpenditure = totalExpenses + totalUtilities
-
-  const netProfit = revenue - totalExpenditure
-  const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0
-
-  const inventoryValue = inventory.reduce((s, i) => s + (Number(i.quantity) * Number(i.unitPrice)), 0)
-  const lowStockCount = inventory.filter((i) => Number(i.quantity) <= Number(i.minimumThreshold) && Number(i.quantity) > 0).length
-
-  const activeWorkers = workers.filter((w) => w.status === 'active').length
-  const monthlySalary = workers.filter((w) => w.status === 'active').reduce((s, w) => s + (w.salary || 0), 0)
-
+async function loadReports({ branchId, dateFrom, dateTo } = {}) {
+  const filters = { ...(branchId && branchId !== 'all' ? { branchId } : {}) }
+  const results = await Promise.all([
+    listSales({ ...filters, dateFrom, dateTo }),
+    listExpenses({ ...filters, dateFrom, dateTo }),
+    listProduction({ ...filters, dateFrom, dateTo }),
+    listUtilities(filters),
+    listItems(filters),
+    listWorkers(filters),
+    listAnimals(filters),
+    listAttendance({ ...filters, dateFrom, dateTo }),
+    listPayments({ ...filters, dateFrom, dateTo }),
+  ])
+  const error = results.find((result) => result.error)?.error
+  if (error) throw new Error(error)
+  const [sales, expenses, production, utilities, inventory, workers, animals, attendance, payments] =
+    results.map((result) => result.data)
   return {
-    data: {
-      revenue, collected, receivables,
-      expenses: totalExpenses, utilities: totalUtilities, totalExpenditure,
-      netProfit, profitMargin,
-      salesCount: sales.length,
-      expenseCount: expenses.length,
-      productionCount: production.length,
-      inventoryValue, lowStockCount, inventoryItems: inventory.length,
-      activeWorkers, totalWorkers: workers.length, monthlySalary,
-      animals: animals.length,
-      animalsByHealth: animals.reduce((acc, a) => {
-        acc[a.health || 'healthy'] = (acc[a.health || 'healthy'] || 0) + 1
-        return acc
-      }, {}),
-    },
-    error: null,
+    sales: sales.filter((row) => isInDateRange(row, dateFrom, dateTo)),
+    expenses: expenses.filter((row) => isInDateRange(row, dateFrom, dateTo)),
+    production: production.filter((row) => isInDateRange(row, dateFrom, dateTo)),
+    utilities: utilities.filter((row) => (!dateFrom || row.billingPeriod >= dateFrom.slice(0, 7))
+      && (!dateTo || row.billingPeriod <= dateTo.slice(0, 7))),
+    inventory, workers, animals,
+    attendance: attendance.filter((row) => isInDateRange(row, dateFrom, dateTo)),
+    payments: payments.filter((row) => isInDateRange(row, dateFrom, dateTo)),
   }
 }
 
-// ─────────── PROFIT & LOSS (monthly trend) ───────────
-export async function getProfitLoss({ farmId, branchId, dateFrom, dateTo } = {}) {
-  await delay()
-  const sales = filterBy(read('sales'), { farmId, branchId }).filter((s) => within(s.date, dateFrom, dateTo))
-  const expenses = filterBy(read('expenses'), { farmId, branchId }).filter((e) => within(e.date, dateFrom, dateTo))
-  const utilities = filterBy(read('utilities'), { farmId, branchId })
-
-  const months = {}
-  const addMonth = (m) => { if (!months[m]) months[m] = { month: m, revenue: 0, collected: 0, expenses: 0, utilities: 0, profit: 0 } }
-
-  sales.forEach((s) => {
-    const m = s.date?.slice(0, 7); if (!m) return
-    addMonth(m); months[m].revenue += s.total || 0; months[m].collected += s.paidAmount || 0
-  })
-  expenses.forEach((e) => {
-    const m = e.date?.slice(0, 7); if (!m) return
-    addMonth(m); months[m].expenses += e.amount || 0
-  })
-  utilities.forEach((u) => {
-    const m = u.billingPeriod?.slice(0, 7); if (!m) return
-    addMonth(m); months[m].utilities += u.amount || 0
-  })
-
-  Object.values(months).forEach((m) => { m.profit = m.revenue - m.expenses - m.utilities })
-  const rows = Object.values(months).sort((a, b) => (a.month < b.month ? -1 : 1))
-
-  return { data: rows, error: null }
+async function report(callback) {
+  try {
+    return { data: await callback(), error: null }
+  } catch (error) {
+    return { data: null, error: error.message }
+  }
 }
 
-// ─────────── EXPENSES BREAKDOWN ───────────
-export async function getExpensesBreakdown({ farmId, branchId, dateFrom, dateTo } = {}) {
-  await delay()
-  const rows = filterBy(read('expenses'), { farmId, branchId }).filter((e) => within(e.date, dateFrom, dateTo))
-
-  const byCategory = {}
-  rows.forEach((e) => {
-    if (!byCategory[e.category]) byCategory[e.category] = { amount: 0, count: 0 }
-    byCategory[e.category].amount += e.amount || 0
-    byCategory[e.category].count += 1
-  })
-  const categories = Object.entries(byCategory).map(([id, v]) => ({ category: id, ...v })).sort((a, b) => b.amount - a.amount)
-
-  const total = rows.reduce((s, e) => s + (e.amount || 0), 0)
-
-  return { data: { categories, total, count: rows.length }, error: null }
-}
-
-// ─────────── SALES REPORT ───────────
-export async function getSalesReport({ farmId, branchId, dateFrom, dateTo } = {}) {
-  await delay()
-  const rows = filterBy(read('sales'), { farmId, branchId }).filter((s) => within(s.date, dateFrom, dateTo))
-
-  const byItem = {}
-  rows.forEach((s) => {
-    if (!byItem[s.itemType]) byItem[s.itemType] = { revenue: 0, collected: 0, count: 0 }
-    byItem[s.itemType].revenue += s.total || 0
-    byItem[s.itemType].collected += s.paidAmount || 0
-    byItem[s.itemType].count += 1
-  })
-  const items = Object.entries(byItem).map(([id, v]) => ({ itemType: id, ...v })).sort((a, b) => b.revenue - a.revenue)
-
-  const byPaymentStatus = {}
-  rows.forEach((s) => {
-    if (!byPaymentStatus[s.paymentStatus]) byPaymentStatus[s.paymentStatus] = { count: 0, amount: 0 }
-    byPaymentStatus[s.paymentStatus].count += 1
-    byPaymentStatus[s.paymentStatus].amount += s.total || 0
-  })
-
-  return { data: { items, byPaymentStatus, count: rows.length }, error: null }
-}
-
-// ─────────── PRODUCTION REPORT ───────────
-export async function getProductionReport({ farmId, branchId, dateFrom, dateTo } = {}) {
-  await delay()
-  const rows = filterBy(read('production'), { farmId, branchId }).filter((p) => within(p.date, dateFrom, dateTo))
-
-  const byType = {}
-  rows.forEach((p) => {
-    if (!byType[p.type]) byType[p.type] = { quantity: 0, unit: p.unit, count: 0 }
-    byType[p.type].quantity += p.quantity || 0
-    byType[p.type].count += 1
-  })
-  const types = Object.entries(byType).map(([id, v]) => ({ type: id, ...v })).sort((a, b) => b.quantity - a.quantity)
-
-  return { data: { types, count: rows.length }, error: null }
-}
-
-// ─────────── INVENTORY REPORT ───────────
-export async function getInventoryReport({ farmId, branchId } = {}) {
-  await delay()
-  const rows = filterBy(read('inventory_items'), { farmId, branchId })
-  const now = new Date()
-
-  const byCategory = {}
-  let totalValue = 0
-  let lowStock = 0
-  let expiring = 0
-  let expired = 0
-
-  rows.forEach((i) => {
-    const value = Number(i.quantity || 0) * Number(i.unitPrice || 0)
-    totalValue += value
-    if (!byCategory[i.category]) byCategory[i.category] = { items: 0, value: 0 }
-    byCategory[i.category].items += 1
-    byCategory[i.category].value += value
-    if (Number(i.quantity) <= Number(i.minimumThreshold) && Number(i.quantity) > 0) lowStock++
-    if (i.expiryDate) {
-      const days = Math.floor((new Date(i.expiryDate) - now) / (1000 * 60 * 60 * 24))
-      if (days < 0) expired++
-      else if (days <= 30) expiring++
+export async function getOverview(filters = {}) {
+  return report(async () => {
+    const data = await loadReports(filters)
+    const revenue = data.sales.reduce((sum, row) => sum + Number(row.total || 0), 0)
+    const collected = data.sales.reduce((sum, row) => sum + Number(row.paidAmount || 0), 0)
+    const receivables = revenue - collected
+    const expenses = data.expenses.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    const utilities = data.utilities.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    const totalExpenditure = expenses + utilities
+    const inventoryValue = data.inventory.reduce((sum, row) => sum + Number(row.quantity || 0) * Number(row.unitPrice || 0), 0)
+    const activeWorkers = data.workers.filter((worker) => worker.status === 'active')
+    return {
+      revenue, collected, receivables, expenses, utilities, totalExpenditure,
+      netProfit: revenue - totalExpenditure,
+      profitMargin: revenue ? ((revenue - totalExpenditure) / revenue) * 100 : 0,
+      salesCount: data.sales.length, expenseCount: data.expenses.length, productionCount: data.production.length,
+      inventoryValue,
+      lowStockCount: data.inventory.filter((item) => Number(item.quantity) <= Number(item.minimumThreshold) && Number(item.quantity) > 0).length,
+      inventoryItems: data.inventory.length,
+      activeWorkers: activeWorkers.length,
+      totalWorkers: data.workers.length,
+      monthlySalary: activeWorkers.reduce((sum, worker) => sum + Number(worker.salary || 0), 0),
+      animals: data.animals.length,
+      animalsByHealth: data.animals.reduce((counts, animal) => {
+        const health = animal.health || 'healthy'
+        counts[health] = (counts[health] || 0) + 1
+        return counts
+      }, {}),
     }
   })
-  const categories = Object.entries(byCategory).map(([id, v]) => ({ category: id, ...v })).sort((a, b) => b.value - a.value)
-
-  return { data: { categories, totalValue, lowStock, expiring, expired, totalItems: rows.length }, error: null }
 }
 
-// ─────────── WORKERS REPORT ───────────
-export async function getWorkersReport({ farmId, branchId, dateFrom, dateTo } = {}) {
-  await delay()
-  const workers = filterBy(read('workers'), { farmId, branchId })
-  const attendance = read('attendance').filter((a) => within(a.date, dateFrom, dateTo) && workers.some((w) => w.id === a.workerId))
-  const payments = read('worker_payments').filter((p) => within(p.date, dateFrom, dateTo) && workers.some((w) => w.id === p.workerId))
-
-  const activeWorkers = workers.filter((w) => w.status === 'active').length
-  const monthlySalary = workers.filter((w) => w.status === 'active').reduce((s, w) => s + (w.salary || 0), 0)
-
-  const attendanceByStatus = {}
-  attendance.forEach((a) => {
-    attendanceByStatus[a.status] = (attendanceByStatus[a.status] || 0) + 1
+export async function getProfitLoss(filters = {}) {
+  return report(async () => {
+    const data = await loadReports(filters)
+    const months = new Map()
+    const monthRow = (month) => {
+      if (!months.has(month)) months.set(month, { month, revenue: 0, collected: 0, expenses: 0, utilities: 0, profit: 0 })
+      return months.get(month)
+    }
+    data.sales.forEach((row) => {
+      const month = row.date?.slice(0, 7)
+      if (!month) return
+      const item = monthRow(month)
+      item.revenue += Number(row.total || 0)
+      item.collected += Number(row.paidAmount || 0)
+    })
+    data.expenses.forEach((row) => {
+      const month = row.date?.slice(0, 7)
+      if (month) monthRow(month).expenses += Number(row.amount || 0)
+    })
+    data.utilities.forEach((row) => {
+      const month = row.billingPeriod?.slice(0, 7)
+      if (month) monthRow(month).utilities += Number(row.amount || 0)
+    })
+    return [...months.values()].map((row) => ({
+      ...row,
+      profit: row.revenue - row.expenses - row.utilities,
+    })).sort((a, b) => a.month.localeCompare(b.month))
   })
+}
 
-  const paidByType = {}
-  payments.forEach((p) => {
-    paidByType[p.type] = (paidByType[p.type] || 0) + (p.amount || 0)
+export async function getExpensesBreakdown(filters = {}) {
+  return report(async () => {
+    const { expenses } = await loadReports(filters)
+    const totals = new Map()
+    expenses.forEach((row) => {
+      const value = totals.get(row.category) || { amount: 0, count: 0 }
+      value.amount += Number(row.amount || 0)
+      value.count += 1
+      totals.set(row.category, value)
+    })
+    const categories = [...totals].map(([category, value]) => ({ category, ...value }))
+      .sort((a, b) => b.amount - a.amount)
+    return { categories, total: expenses.reduce((sum, row) => sum + Number(row.amount || 0), 0), count: expenses.length }
   })
+}
 
-  return {
-    data: {
-      totalWorkers: workers.length,
-      activeWorkers,
-      monthlySalary,
-      attendanceCount: attendance.length,
+export async function getSalesReport(filters = {}) {
+  return report(async () => {
+    const { sales } = await loadReports(filters)
+    const byItem = new Map()
+    const byPaymentStatus = {}
+    sales.forEach((row) => {
+      const item = byItem.get(row.itemType) || { revenue: 0, collected: 0, count: 0 }
+      item.revenue += Number(row.total || 0)
+      item.collected += Number(row.paidAmount || 0)
+      item.count += 1
+      byItem.set(row.itemType, item)
+      const payment = byPaymentStatus[row.paymentStatus] || { count: 0, amount: 0 }
+      payment.count += 1
+      payment.amount += Number(row.total || 0)
+      byPaymentStatus[row.paymentStatus] = payment
+    })
+    const items = [...byItem].map(([itemType, value]) => ({ itemType, ...value }))
+      .sort((a, b) => b.revenue - a.revenue)
+    return { items, byPaymentStatus, count: sales.length }
+  })
+}
+
+export async function getProductionReport(filters = {}) {
+  return report(async () => {
+    const { production } = await loadReports(filters)
+    const byType = new Map()
+    production.forEach((row) => {
+      const item = byType.get(row.type) || { quantity: 0, unit: row.unit, count: 0 }
+      item.quantity += Number(row.quantity || 0)
+      item.count += 1
+      byType.set(row.type, item)
+    })
+    const types = [...byType].map(([type, value]) => ({ type, ...value }))
+      .sort((a, b) => b.quantity - a.quantity)
+    return { types, count: production.length }
+  })
+}
+
+export async function getInventoryReport(filters = {}) {
+  return report(async () => {
+    const { inventory } = await loadReports(filters)
+    const now = new Date()
+    const categories = new Map()
+    let totalValue = 0
+    let lowStock = 0
+    let expiring = 0
+    let expired = 0
+    inventory.forEach((item) => {
+      const value = Number(item.quantity || 0) * Number(item.unitPrice || 0)
+      totalValue += value
+      const category = categories.get(item.category) || { items: 0, value: 0 }
+      category.items += 1
+      category.value += value
+      categories.set(item.category, category)
+      if (Number(item.quantity) <= Number(item.minimumThreshold) && Number(item.quantity) > 0) lowStock += 1
+      if (item.expiryDate) {
+        const days = Math.floor((new Date(item.expiryDate) - now) / 86400000)
+        if (days < 0) expired += 1
+        else if (days <= 30) expiring += 1
+      }
+    })
+    return {
+      categories: [...categories].map(([category, value]) => ({ category, ...value })).sort((a, b) => b.value - a.value),
+      totalValue, lowStock, expiring, expired, totalItems: inventory.length,
+    }
+  })
+}
+
+export async function getWorkersReport(filters = {}) {
+  return report(async () => {
+    const data = await loadReports(filters)
+    const active = data.workers.filter((worker) => worker.status === 'active')
+    const attendanceByStatus = {}
+    data.attendance.forEach((row) => {
+      attendanceByStatus[row.status] = (attendanceByStatus[row.status] || 0) + 1
+    })
+    const paidByType = {}
+    data.payments.forEach((row) => {
+      paidByType[row.type] = (paidByType[row.type] || 0) + Number(row.amount || 0)
+    })
+    return {
+      totalWorkers: data.workers.length,
+      activeWorkers: active.length,
+      monthlySalary: active.reduce((sum, worker) => sum + Number(worker.salary || 0), 0),
+      attendanceCount: data.attendance.length,
       attendanceByStatus,
-      paymentCount: payments.length,
+      paymentCount: data.payments.length,
       paidByType,
-      totalPaid: payments.reduce((s, p) => s + (p.amount || 0), 0),
-    },
-    error: null,
-  }
+      totalPaid: data.payments.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    }
+  })
 }

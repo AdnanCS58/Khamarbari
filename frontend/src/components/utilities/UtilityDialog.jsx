@@ -83,11 +83,11 @@ export default function UtilityDialog({ open, onOpenChange, editing, onSaved }) 
         prevReading: 0, currentReading: 0, unit: cfg?.unit || '',
         amount: '', dueDate: '', paidDate: '', status: 'pending',
         invoiceNo: '',
-        branchId: selectedBranchId !== 'all' ? selectedBranchId : '',
+        branchId: selectedBranchId !== 'all' ? selectedBranchId : (branches[0]?.id || ''),
         notes: '',
       })
     }
-  }, [open, editing, selectedBranchId, reset])
+  }, [open, editing, selectedBranchId, branches, reset])
 
   const prev = watch('prevReading')
   const cur = watch('currentReading')

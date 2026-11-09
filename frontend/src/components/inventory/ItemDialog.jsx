@@ -72,11 +72,11 @@ export default function ItemDialog({ open, onOpenChange, editing, onSaved }) {
         name: '', sku: '', category: 'feed', unit: 'kg',
         quantity: 0, minimumThreshold: 0, unitPrice: 0,
         supplier: '', expiryDate: '',
-        branchId: selectedBranchId !== 'all' ? selectedBranchId : '',
+        branchId: selectedBranchId !== 'all' ? selectedBranchId : (branches[0]?.id || ''),
         notes: '',
       })
     }
-  }, [open, editing, selectedBranchId, reset])
+  }, [open, editing, selectedBranchId, branches, reset])
 
   const onSubmit = async (values) => {
     setSubmitting(true)

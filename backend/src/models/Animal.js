@@ -14,6 +14,7 @@ const animalSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    enclosureId: { type: mongoose.Schema.Types.ObjectId, ref: 'Enclosure', default: null, index: true },
     tag: { type: String, required: true, trim: true },
     name: { type: String, trim: true },
     species: { type: String, required: true, trim: true },

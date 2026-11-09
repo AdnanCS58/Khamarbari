@@ -71,11 +71,11 @@ export default function WorkerDialog({ open, onOpenChange, editing, onSaved }) {
         role: 'caretaker',
         joiningDate: new Date().toISOString().slice(0, 10),
         salary: 0, status: 'active',
-        branchId: selectedBranchId !== 'all' ? selectedBranchId : '',
+        branchId: selectedBranchId !== 'all' ? selectedBranchId : (branches[0]?.id || ''),
         notes: '',
       })
     }
-  }, [open, editing, selectedBranchId, reset])
+  }, [open, editing, selectedBranchId, branches, reset])
 
   const onSubmit = async (values) => {
     setSubmitting(true)

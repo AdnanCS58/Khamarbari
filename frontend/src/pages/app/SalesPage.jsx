@@ -108,7 +108,7 @@ export default function SalesPage() {
 
   const exportCsv = () => {
     const header = [
-      'Date', 'Invoice', 'Item', 'Quantity', 'Unit', 'Unit Price',
+      'Date', 'Invoice', 'Item', 'Enclosure', 'Quantity', 'Unit', 'Unit Price',
       'Total', 'Paid', 'Outstanding', 'Buyer', 'Payment Status',
     ]
     const lines = [header.join(',')]
@@ -118,6 +118,7 @@ export default function SalesPage() {
           r.date,
           r.invoiceNo,
           r.itemType,
+          `"${(r.enclosureName || '').replace(/"/g, '""')}"`,
           r.quantity,
           r.unit,
           r.unitPrice,
@@ -275,6 +276,11 @@ export default function SalesPage() {
                           <div className="text-xs text-forest-700/60">
                             {r.quantity} {r.unit} × {bdt(r.unitPrice)}
                           </div>
+                          {r.enclosureName && (
+                            <div className="text-[11px] text-emerald-700 font-medium mt-0.5">
+                              Habitat: {r.enclosureName}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-forest-700/80">
                           {r.buyer}

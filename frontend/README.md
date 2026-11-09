@@ -1,16 +1,17 @@
-# React + Vite
+# Khamar frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React/Vite frontend reads and writes farm records through the Express API. It does not contain a demo database or offline write fallback.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Start MongoDB and configure `backend/.env` from `backend/.env.example`.
+2. From `backend`, run `npm install` once and `npm run dev`.
+3. From `frontend`, copy `.env.example` to `.env.local`, run `npm install` once, then `npm run dev`.
 
-## React Compiler
+The default API URL is `http://localhost:5000/api`. Set `VITE_API_URL` to the reachable API base URL (including `/api`) when it differs. Vite embeds this value at build time.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Deployment
 
-## Expanding the Oxlint configuration
+Deploy the frontend as a static Vite site and deploy the Express backend separately with MongoDB. Set the frontend build environment variable `VITE_API_URL` to the public Express API URL, and set the backend `CORS_ORIGIN` to the exact deployed frontend origin(s). Keep MongoDB and JWT credentials only in the backend environment; do not put them in frontend variables.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+`npm run build` creates the static frontend bundle in `dist`. `npm run lint` runs ESLint.

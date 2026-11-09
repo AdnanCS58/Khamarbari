@@ -37,7 +37,8 @@ export async function login({ contact, password }) {
     })
     
     // Decode the JWT to get the expiration time
-    const payloadBase64 = data.token.split('.')[1]
+    const rawPayload = data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payloadBase64 = rawPayload.padEnd(rawPayload.length + ((4 - (rawPayload.length % 4)) % 4), '=')
     const decodedPayload = JSON.parse(atob(payloadBase64))
     
     storage.set(SESSION_KEY, { 
@@ -70,24 +71,35 @@ export async function getSession() {
     return { data: null, error: null }
   }
 
-  // 3. Token is valid! Let them in immediately.
-  // We return the local session data so the UI loads instantly.
-  
-  // 4. Silently fetch fresh data from the server in the background
-  apiFetch('/auth/me').then((freshData) => {
-    // Update the local storage with the latest farm/user info
-    storage.set(SESSION_KEY, { ...session, user: freshData.user, farm: freshData.farm })
-  }).catch(() => {
-    // If the server is asleep, we don't care! They are already logged in.
-  })
-
-  return { data: session, error: null }
+  try {
+    const freshData = await apiFetch('/auth/me', {
+      headers: { Authorization: `Bearer ${session.token}` },
+    })
+    const validatedSession = {
+      ...session,
+      user: freshData.user,
+      farm: freshData.farm,
+    }
+    storage.set(SESSION_KEY, validatedSession)
+    return { data: validatedSession, error: null }
+  } catch (error) {
+    storage.remove(SESSION_KEY)
+    return { data: null, error: error.message }
+  }
 }
 
 export async function updateProfile(patch) {
-  return { data: patch, error: null } 
+  try {
+    const result = await apiFetch('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+    return { data: result.user, error: null }
+  } catch (error) {
+    return { data: null, error: error.message }
+  }
 }
 
-export async function requestPasswordReset(contact) {
-  return { data: { ok: true, contact }, error: null }
+export async function requestPasswordReset() {
+  return { data: null, error: 'Password reset is not configured. Contact your farm administrator.' }
 }
